@@ -1,0 +1,223 @@
+X-pack:- 
+	Security
+	Monitoring
+	Alerting
+	Reporting 
+	Machine Learning
+	Forecasting 
+	Graph-related products(relevance) API 
+	Elasticsearch SQL- Query DSL
+	
+APM- Application Performance Management
+
+Hierarchy:
+
+Cluster
+|
+Nodes
+|
+Index (group together related documents)
+|
+Shards(Lucene Index)
+|
+Document(json like structure)
+
+Basic Query:
+GET /_cluster/health : checks cluster health
+output: {
+  "cluster_name": "elasticsearch",
+  "status": "green",
+  "timed_out": false,
+  "number_of_nodes": 1,
+  "number_of_data_nodes": 1,
+  "active_primary_shards": 11,
+  "active_shards": 11,
+  "relocating_shards": 0,
+  "initializing_shards": 0,
+  "unassigned_shards": 0,
+  "delayed_unassigned_shards": 0,
+  "number_of_pending_tasks": 0,
+  "number_of_in_flight_fetch": 0,
+  "task_max_waiting_in_queue_millis": 0,
+  "active_shards_percent_as_number": 100
+}
+
+GET /_cat/nodes?v : gives nodes inside a cluster
+output: 127.0.0.1           44          79  13                          cdfhilmrstw *      HVTNDAL1082
+
+GET /_cat/indices?v&expand_wildcards=all : gives the indices present
+
+Introduction to sharding:
+1. Sharding is a way to divide indices into smaller pieces.
+2. Each piece is referred to as a shard
+3. Sharding is done at index level
+4. The main purpose is to horizontally scale the data volume
+5. A shard is an independent index..kind of
+6. Each shard is an Apache Lucene index
+7. An Elasticsearch index consists of one or more lucene indices
+8. A shard has no predefined size;it grows as documents are added to it
+9. A shard may store up to about two billion documents
+
+Purpose:
+1. Mainly to be able to store more documents
+2. To easier fit large indices onto nodes
+3. Imoroved performance - Parallelization of queries increases the throughput of an index.i.e a query can run on multiple shards at same time
+
+An index contains a single shard by default
+We can increase the number of shards per index by using the split API
+We can decrease the number of shards per index by using the shrink API
+
+
+
+Replication:
+
+For Fault-Tolerance
+1. Replication is configured at the index level
+2. Replication works by creating copies of shards, referred to as replica shards
+3. A shard that has been replicated, is called a primary shard
+4. A primary shard and its replics shards are referred to as replication group
+5. Replica shards are a complete copy of a shard
+6. A replica shard can serve search requests, exactly like a primary shard
+7. The number of replicas can be configured at index creation
+8. The replica shards are stored on different nodes i.e nodes other than primary shard.
+Generally replication once is enough but in critical cases data should be replicated at least twice
+
+Snapshots:
+Elasticsearch supports taking snapshots as backups
+Snapshots ca be used to restore to a given point in time
+Snapshots can be taken at index level or for the entire cluster
+
+Replication only assures high availability but the consistency is not assured for rollback we have to use snapshots
+Replication can also increase the query throughput because instead of querying a single shard we can have multiple replicas and query them.
+
+To create a simple index use following command: PUT /<name-of-index>
+
+If we check all the indices we see that the status of our new index is yellow that's because it contains a primary shard and another replica shard which is unallocated. So it's a warning
+And we can also see that kibana related indices have 0 replicas this is because there is only one node in the cluster, but if we add another node to the cluster it will automatically change to 1 because of the attribute called "auto_expand_replicas" which is in kibana.
+
+Types of nodes:
+1) master-eligible (can be used as cluster master and will be responsible for creating and deleting indices and this node will not automatically become the master node unless there is no other node of this type) useful for large clusters. config: node.master: true|false
+
+2) Data node:
+Used for storing and performing queries on data. this role is always enabled for small clsuters and config: node.data: true| false
+
+3) Ingest:
+enables a node to run ingest pipeline
+ingest pipelines are a series of steps(processors) that are performed when indexing documents. processors may manipulate documents
+config: node.ingest: true|false
+similar to logstash pipeline
+
+4) machine learning:
+node.ml identifies the node as ml node
+xpack.ml.enabled enables or disables the machine learning api for the node
+
+5) co-ordination:
+co-ordination refers to the distribution of queries and the aggregation of results
+config req:
+node.master: false
+node.data: false
+node.ingest: false
+node.ml: false
+xpack.ml.enabled: false
+
+6) Voting-only
+very rarely used
+only used in the process of selecting the cluster master in large clusters
+
+Logstash like tool called Apache Flume
+
+Scripted Updates in Elasticsearch:
+ES supports scripting.
+POST /products/_update/100
+{
+  "script":{
+    "source": "ctx._source.in_stock -= params.quantity",
+    "params":{
+      "quantity":4
+    }
+  }
+}
+
+
+Routing:
+It is the process used by ES to find the shard in which document is stored
+shard_num = hash(_routing) % num_primary_shards - This will result in document id
+We can perform custom routing
+We cannot change the number of shards once an index is created because the whole routing formula is dependent on it.
+
+How elasticsearch reads data?
+1) A read request is received and handled by a coordinating node
+2) Routing is used to resolve the document's replication group
+3) ARS is used to send the query to the best available shard.
+	i) ARS stands for Adaptive Replica Selection
+	ii) ARS helps reduce query response time
+	iii) ARS is essentially an intelligent load balancer
+4) The coordinating node collects the response and sends it to the client
+
+How elasticsearch writes data?
+Instead of ARS the write requests are always sent to the primary shard (validation)
+Then after writing to primary shard this data is sent to other replicas for Synchronization
+Primary Terms:
+It is a way to distinguish between old and new primary shards
+Essentially a counter for how many times the primary shard has changed
+The primary term is appended to write operations
+Sequence Number:
+Appended to write operations together with the primary term
+Essentially a counter that is incremented for each write operation
+The primary shard increases the sequence number
+Enables Elasticsearch to order write operations
+
+
+Primary terms and sequence number are key when Elasticsearch needs to recover from a primary shard failure
+It enables elasticsearch to more efficiently figure out which write operations need to be applied
+For large indices, this process is really expensive
+To speed up this process ES maintains global and local checkpoints
+
+Each replication group has a global checkpoint 
+Each replica shard has a local checkpoint
+Global checkpoints: The sequence number that all active shards within a replication group have been aligned at least upto
+Local checkpoints: The sequence number for the last write operation that was performed
+
+Document Versioning:
+Not a revision history
+_version metadata field with every document
+The value is Integer which is incremented by one when modifying a document and this value is retained for 60 seconds when deleting a document
+configured with index.gc_deletes
+Versioning tells you how many times a document is modified and is not used much
+
+
+OPTIMISTIC CONCURRENCY CONTROL:
+Here we consider a scenario in which two events are trying to update the same value inside a document. Let's say they are both trying to update the quantity parameter for a product.
+If both the events acquired the value to update at the same time they'll get the same value and if one of the events updates the value and then other one updates the value, what the other one did is update the old value so data becomes inconsistent so what we can do is check for primary term and sequence number for the document and if it matches then only the update will take place else the other event  will acquire the value again and then goon to updating it
+
+PESSIMISTIC (just for RDBMS) : We use locks here. but this will remove concurrency and slow down the system so mostly optimistic approach is used
+
+Update by Query:
+POST /products/_update_by_query
+{
+  "script": {
+    "source": "ctx._source.in_stock--"
+  },
+  "query": {
+    "match_all": {}
+  }
+}
+
+Delete by query:
+POST /products/_delete_by_query
+{
+  "query": {
+    "match_all": { }
+  }
+}
+
+BULK API:
+This API allows you to insert, update and delete documnets with a single query
+POST /_bulk
+{"index":{"_index":"products","_id":200}}
+{ "name": "Espresso Machine", "price": 199, "in_stock": 5 }
+{ "create": { "_index": "products", "_id": 201 } }
+{ "name": "Milk Frother", "price": 149, "in_stock": 14 }
+
+In this query 1st line should specify the action and the next line should specify the data
+And then you can follow this pattern
