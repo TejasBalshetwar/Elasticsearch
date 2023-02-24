@@ -221,3 +221,739 @@ POST /_bulk
 
 In this query 1st line should specify the action and the next line should specify the data
 And then you can follow this pattern
+
+Analysis:
+Referred to as text analysis
+Applicable to text fields/values
+Text values are analysed when indexing documents
+The result is stored in data structures that are efficient for searching
+The _source object is not used when searching for documents
+- It conatins the exact values specified when creating a document
+
+Document --> Analyser --> Storage
+Three Analysers: Character filters, tokenizer, Token filters
+
+Character Filters:
+- Adds,removes or changes characters
+- Analyzers contain zero or more character filters
+- Character filters are applied in the order in which they are specified
+Example We can use the html_strip filter extract text from html
+
+Tokenizers:
+An analyzer contains one tokenizer
+Tokenizes a string, splits it into tokens
+Characters may be stripped as a part of tokenization
+
+Token filters
+- Receive the output of the tokenizer as input
+A token filter can add,remove or modeify tokens
+An analyser contains zero or more token filters
+Token filters are applied in the order in which they are specified
+Example- lowercase filter 
+
+Standard Analyzer :- Character filter-None, Tokenizer- standard, Token filter-Lowercase
+
+Inverted Indices:
+Mapping between terms(tokens) and which documents contain them.
+Outside the context of analyzers, we use the ternminology "terms"
+It stores 1 or 0 if the term is in the document
+Terms are sorted alphabetically
+It also contains information for relevance scoring
+Inverted indices are created according to the field values
+They are used only for text fields
+Other data types such as integer,float,dates,geospatial data are stored using BKD trees.
+Inverted index is created and maintained by Apache Lucene
+
+Mapping:
+It defines the structure of documents(e.g fields and their data types)
+Also used to configure how values are indexed
+Similar to a table'schema in a relational database
+Explicit mapping- here we define structure for the index ourselves
+Dynamic mapping- Elasticsearch generates the field mappings for us
+We can combine both mappings.
+
+Generic Data Types:
+object - used for any JSON object (also can be nested) nested data type maintainss the object relationships
+integer
+long
+boolean
+double
+float
+short
+date
+text
+keyword -  this data type should only be used for exact searches. typically used for filtering, aggregation, sorting
+
+Specialized Data types e.g. IP to store IP addresses or Geospatial
+
+Keyword data type:
+keyword fields are analyzed with the keyword analyzer
+This is a noop analyzer
+It outputs the unmodified string as a single token
+
+Type Coercion:
+In elasticsearch when inserting documents, it check for the data types
+If we supply 7.5 at the beginning then in mapping the tyoe of that variable will be set to float
+The if we give "7.5" then it will check if the value received contains a numeric value and if it does then it will store it as float else throw an error
+The _souce object contains the original values and not the indexed values
+Search queries use indexed values and not _source
+Coercion is not used for dynamic mapping
+We must always use the correct data types
+
+
+Arrays in ES:
+There is no such thing
+Any field can contain zero or more values there is no need for configuration and simply supply an array when indexing a document
+Text data type assigned in dynamic mapping
+All the values given in the array are simply merged together
+and while tokenizing seperated into different tokens
+Array values should be of the same data type
+Coercion only works for fields that are already mapped
+
+
+Explicit Mapping Example:
+PUT /review
+{
+  "mappings":{
+    "properties":{
+      "rating":{"type":"float"},
+      "content":{"type":"text"},
+      "product_id":{"type":"integer"},
+      "author":{
+        "properties":{
+          "first_name":{"type":"text"},
+          "last_name":{"type":"text"},
+          "email":{"type":"keyword"}
+        }
+      }
+    }
+  }
+}
+
+Retrieve mappings:
+GET /review/_mapping
+
+Retrieve mapping for a particular field:
+GET /review/_mapping/field/content
+
+We can also define mappings using the dot notation:
+PUT /reviews_dot_notation
+{
+  "mappings": {
+    "properties": {
+      "rating": { "type": "float" },
+      "content": { "type": "text" },
+      "product_id": { "type": "integer" },
+      "author.first_name": { "type": "text" },
+      "author.last_name": { "type": "text" },
+      "author.email": { "type": "keyword" }
+    }
+  }
+}
+
+This will produce same results as above but this is a more readable way. What ES does is while processing the mapping it will use properties whenver dot notation is used
+
+Adding mappings to exiting indices:
+Use the mapping API
+PUT /review/_mapping
+{
+  "properties":{
+    "created_at":{"type":"date"}
+  }
+}
+
+How dates work in ElasticSearch:
+Specified in one of 3 ways:
+1) Specially formatted strings
+2) Milliseconds since the epoch (long)
+3) Seconds since the epoch(integer)
+Epoch refers to 1st Jan 1970
+Custom formats are also supported
+
+
+Three supported formats:
+- A date with time
+- A date without time
+- Milliseconds since the epoch
+UTC timezone is default ISO 8601 format
+
+Elasticsearch stores dates as milliseconds since the epoch even if you specify string date it will convert to long
+If the time is not specified then ES will assume its midnight 00:00
+
+How to handle missing values:
+In ES all fields are optional so we can leave any field empty even if we create a mapping for it.
+The missing values should be handled at application level
+
+Mapping Parameters:
+There more mapping parameters than type
+1) format parameter:
+Used to customize the format for date fields
+Wherever posssible default should be used
+Using Java's DateFormatter syntax:
+E.g: "dd/MM/yyyy"
+Using built-in formats
+E.g: "epoch_second"
+2) properties parameter:
+Define nested fields for object and nested fields
+3) coerce paramter:
+Used to enable or disable coercion of value (default enabled)
+4) doc_values parameter:
+ES makes use of several data structures
+Inverted indices are excellent for searching but they dont perform  well for many other data access patterns
+"Doc values" is another data structure used by Apache Lucene - It is optimised for a different data access pattern (document->terms)
+It is usually used for sorting, aggregations and scripting. Its an additional data structure not a substitute. ES automatically queries the appropraite data structure depending on the query.
+To disable it we can set the doc_values parameter to false to save disk space
+Only disbale doc_values if you wont use aggregations,sorting or scripting
+Particularly useful for large indices typically not worth it for small ones
+Cannot be changed without reindexing documents into new index.
+5)norms parameter:
+Normalization factors used for relevance scoring
+Many times we dont just want to filter but also rank results
+Norms can be disabled to save disk space
+It can be useful when that field wont be used for relevance scoring
+6) index parameter:
+Disables indexing for the field this means that we wont be able to use those fields in the search queries
+These fields will always be stored in _source . Its just that it wont be present in the index
+Saves disk space and improves indexing throughput
+7) null_value parameter:
+NULL values cannot be indexed or searched
+Use this parameter to replace NULl values with other value
+Only work for explicit NULL values
+The replacement value should be of the same type as the field
+Does not affect data in the _source
+8) copy_to parameter
+It can be used to copy multiple field values into a "group field"
+Simply specify the name of the target field as the value
+The target field will be a part of the index but not the part of the _source field
+
+
+Updating existing mappings:
+Generally in ElasticSearch field mappings cannot be changed
+We can add new field mappings only
+This is because the text values have already been analyzed and changing between some data types would require rebuilding the whole data structure
+Field mappings cannot be removed
+
+Reindexing:
+1) Create a new index
+2) Index documents from old index to new index using a script or using the _reindex API
+POST /_reindex
+{
+  "source": {
+    "index": "reviews"
+  },
+  "dest": {
+    "index": "reviews_new"
+  }
+}
+The changes are reflected at the index level and not the _source object that we get
+To change it in source we can add a script that will do this
+
+
+Use field Aliases:
+We do this by adding new mapping like this-
+PUT /reviews/_mapping
+{
+  "properties": {
+    "comment": {
+      "type": "alias",
+      "path": "content"
+    }
+  }
+}
+This won't show any changes in the _source but when we use the new field mapping that we add using above command then it will show results as it would show for previous field and also it does not change the way in which documents are indexed
+It's also possible create index aliases
+
+Multi-field Mapping:
+They are used to add multiple types to a single field. This will basically create a new inverted index for the new field_type.
+E.g:
+PUT /multi_field_test
+{
+  "mappings": {
+    "properties": {
+      "description": {
+        "type": "text"
+      },
+      "ingredients": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}
+
+How to query that mapping? Heres how
+GET /multi_field_test/_search
+{
+  "query": {
+    "term": {
+      "ingredients.keyword": "Spaghetti"
+    }
+  }
+}
+
+
+Index Templates:
+Index templates specify settings and mappings
+They are applied to indices that match one or more patterns
+Patterns may include wildcards(*)
+Index templates take effect when creating new indices
+E.g:
+PUT /_template/access-logs
+{
+  "index_patterns": ["access-logs-*"],
+  "settings": {
+    "number_of_shards": 2,
+    "index.mapping.coerce": false
+  }, 
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date"
+      },
+      "url.original": {
+        "type": "keyword"
+      },
+      "http.request.referrer": {
+        "type": "keyword"
+      },
+      "http.response.status_code": {
+        "type": "long"
+      }
+    }
+  }
+}
+The mappings are same we just have to add index_patterns to specify which indices to apply template to
+Priorities of index templates:
+A new index may match multiple index templates
+An order parameter can be used to define the priority of index templates- It is a integer. Templates with lower values are merged first
+We can update the index template using the similar command. We can also retrieve or delete them.
+
+
+Elastic common schema:
+It is a specification of common fields and how they should be mapped
+Before ECS, there was no cohesion between field names
+Ingesting logs from ngnix would give different field names than Apache
+Basically field standardization
+ECS means that common fields are named the same thing
+E.g. @timestamp
+Use-case independent
+Group of fields are referred to as field sets
+In ECS documents are referred to as events
+ECs doesn't provide fields for non-events(e.g products)
+ECS is automatically handled by Elastic Stack products
+It's just a good practice.
+
+Dynamic Mapping:
+Dynamic Mapping is enabled by default so the mapping will be created for new fields
+It we set "dynamic" to false then the mapping won't be created for new fields they will simply be ignored we can see them in _source field but they are not indexed
+If we set "dynamic" to strict then the mapping wont be created for new fields and if we supply a field that is not mapped we will get an error
+
+There are date_detection and number_detection for the respective data types like date, long, float.
+
+Dynamic Templates:
+Dynamic templates are added in the mapping object as an object
+In this we have define a condition whose satisfaction will trigger the dynamic templates
+E.g:
+
+PUT /dynamic_template_test
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "integers": {
+          "match_mapping_type": "long",
+          "mapping": {
+            "type": "integer"
+          }
+        }
+      }
+    ]
+  }
+}
+
+Another E.g:
+PUT /test_index
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "strings": {
+          "match_mapping_type": "string",
+          "mapping": {
+            "type": "text",
+            "fields": {
+              "keyword": {
+                "type": "keyword",
+                "ignore_above": 512
+              }
+            }
+          }
+        }
+      }
+    ]
+  }
+}
+
+Match and Unmatch paramteres:
+Used to specify conditions for field names
+Field names must match the condition specified by the match parameter
+unmatch is used to exclude fields that were matched by the match parameter
+Both parameters support wildcards(*)
+E.g:
+PUT /test_index
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "strings_only_text": {
+          "match_mapping_type": "string",
+          "match": "text_*",
+          "unmatch": "*_keyword",
+          "mapping": {
+            "type": "text"
+          }
+        }
+      },
+      {
+        "strings_only_keyword": {
+          "match_mapping_type": "string",
+          "match": "*_keyword",
+          "mapping": {
+            "type": "keyword"
+          }
+        }
+      }
+    ]
+  }
+}
+We can also use regex. we have to specify the match_pattern parameter to be regex
+E.g:
+PUT /test_index
+{
+  "mappings": {
+    "dynamic_templates": [
+      {
+        "names": {
+          "match_mapping_type": "string",
+          "match": "^[a-zA-Z]+_name$",
+          "match_pattern": "regex",
+          "mapping": {
+            "type": "text"
+          }
+        }
+      }
+    ]
+  }
+}
+
+path_match and path_unmatch:
+they are similar to match and unmatch. The difference is that in match/unmatch only the field names are taken into account
+and in path_match/path_unmatch the complete path of the field is taken into account. dot notations
+
+
+Best Practices:
+1) Explicit mapping should be used. It will save space and also increase our control over the index. set dynamic=strict
+2) Disable coercion i.e always use correct data type for the documents
+3) Use appropriate numeric data types
+4) If you dont want to use a field for sorting, aggregation and scripting then set doc_values to false
+5) Set norms to false if we dont need relevance scoring for a field
+6) Set index to false if we dont need to filter on values
+
+
+Stemming and stop words:
+Stemming reduces words to their root form e.g(hiding-->hide)
+Stop words are filtered out during text analysis e.g(a, an, the, in)
+
+Analyzers are used in searching as well. Whenever search for a value in a field the analyzer is applied to the search query as well
+
+
+Built-in Analyzers:
+1) Standard Analyzer
+- Splits text at word boundaries and removes punctuation
+- Done with standard tokenizer
+- uses the lowercase token filter
+- contains the stop token filter (removing stopwords) - disabled by default
+2) simple Analyzer
+- similar to standard analyzer
+- splits into tokens when encountering anything else than letters
+- lowercase letters with the lowercase tokenizer (to avoid passing through data twice)
+3) whitespace Analyzer
+- splits into tokens by whitespace
+- does not lowercase letters
+4) keyword Analyzer
+- No-op analyzer that leaves the input text intact
+- It simply outputs it as single token
+5) pattern Analyzer
+- A regular expression is used to match token seperators
+- This analyzer is very flexible
+- The default pattern matches all non-word characters (\W+)
+- Lowercases letters by default
+
+To use Analyzer we have to specify the "analyzer" in the field mapping
+
+Creating a custom analyzer:
+PUT /analyzer_test_new
+{
+  "settings":{
+    "analysis":{
+      "filter":{
+        "danish_stop":{
+          "type":"stop",
+          "stopwords":"__danish__"
+        }
+      },
+      "analyzer":{
+        "my_custom_analyzer":{
+          "type":"custom",
+          "char_filter":["html_strip"],
+          "tokenizer":"standard",
+          "filter":[
+            "lowercase",
+            "stop",
+            "asciifolding",
+            "danish_stop"
+            ]
+        }
+      }
+    }
+  }
+}
+
+Adding analyzer to existing indices:
+Open index is avaulable for indexing and search requests
+A dclosed index will refuse requests
+There are two types of settings for an index:
+1) Dynamic settings:
+Dynamic settings can be changed without closing the index first
+Requires no downtime
+2) Static settings require the index to be closed first
+Index will be unavailable for some time
+
+Analysis settings are static settings
+
+To close a index use the following command:
+POST /<index-name>/_close
+
+To open a index use:
+POST /<index-name>/_open
+
+
+Updating Analyzer:
+To update an analyzer follow the steps below:
+1) close the index first
+2) write the complete analyzer that you want to be present
+3) Then use the _settings to update the analyzer
+What this does is replace the old analyzer with the one we just passed to it
+4) Open the index for querying
+
+
+Search Methods:
+1) Query DSL
+e.g:
+GET /product/_search
+{
+
+"query":{
+"match":{
+"description":{
+"value":"red wine"
+}
+}
+}
+}
+
+2) Request URI
+GET /product/_search?q=name:pasta
+To use muliptle parameters:
+GET /product/_search?q=tag:electronics AND name:nothing
+
+Mostly Query DSL is used everywhere
+Query DSL e.g:
+GET /products/_search
+{
+  "query": {
+    "match_all": {}
+  }
+}
+There are two types of DSL queries:
+Leaf query: search for a single value
+Compund query: combine leaf queries using bool query
+
+ES uses TF-IDF to calculate relevance scores
+Okapi BM25 currently used by ES
+
+
+Term level queries match for exact values
+Full text queries are first gone through an analyzer so whatever analyzer we applied to documents while indexing, the same will be applied to the query text
+Term level queries dont go through a analyzer
+
+Query context vs Filter context:
+In query context relevance scores are calculated
+In filter context relevance scores are not calculated so there will be an increase in speed
+
+
+Term Level Queries:
+1)
+GET /products/_search
+{
+  "query": {
+    "term": {
+      "is_active": true
+    }
+  
+}
+}
+
+2) Multi-field attributes:
+GET /products/_search
+{
+  "query": {
+    "terms": {
+      "tags.keyword": [ "Soup", "Cake" ]
+    }
+  }
+}
+
+3) Based on IDs:
+GET /products/_search
+{
+  "query": {
+    "ids": {
+      "values": [ 1, 2, 3 ]
+    }
+  }
+}
+
+4) Based on Range values:
+GET /products/_search
+{
+  "query": {
+    "range": {
+      "in_stock": {
+        "gte": 1,
+        "lte": 2
+      }
+    }
+  }
+}
+We can also dates here as well
+For date we can specify the date format
+
+5) We can use relative date and time and also round the off
+GET /products/_search
+{
+  "query": {
+    "range": {
+      "created": {
+        "gte": "2010/01/01||-1y/M"
+      }
+    }
+  }
+}
+subtracting a year and rounding by month
+
+We can also use now for current date and time
+
+6) Matching documents for non-null values:
+
+GET /products/_search
+{
+  "query": {
+    "exists": {
+      "field": "tags"
+    }
+  }
+}
+
+7) Matching based on prefixes:
+
+GET /products/_search
+{
+  "query": {
+    "prefix": {
+      "tags.keyword": "Vege"
+    }
+  }
+}
+
+8) Searching with wildcards:
+
+GET /products/_search
+{
+  "query": {
+    "wildcard": {
+      "tags.keyword": "Veget?ble"
+    }
+  }
+}
+
+GET /products/_search
+{
+  "query": {
+    "wildcard": {
+      "tags.keyword": "Veg*ble"
+    }
+  }
+}
+
+Wildcard queries can be slow
+
+9) Searching with expressions:
+
+GET /products/_search
+{
+  "query": {
+    "regexp": {
+      "tags.keyword": "Veg[a-zA-Z]+ble"
+    }
+  }
+}
+
+
+Full text searching query:
+1) Match query:
+GET /recipe/_search
+{
+  "query": {
+    "match": {
+      "title": "Recipes with pasta or spaghetti"
+    }
+  }
+}
+
+GET /recipe/_search
+{
+  "query": {
+    "match": {
+      "title": {
+        "query": "Recipes with pasta or spaghetti",
+        "operator": "and"
+      }
+    }
+  }
+}
+
+2) match phrase
+GET /recipe/_search
+{
+  "query": {
+    "match_phrase": {
+      "title": "spaghetti puttanesca"
+    }
+  }
+}
+
+3) Multi-field searches:
+GET /recipe/_search
+{
+  "query": {
+    "multi_match": {
+      "query": "pasta",
+      "fields": [ "title", "description" ]
+    }
+  }
+}

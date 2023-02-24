@@ -1,12 +1,40 @@
 from datetime import datetime
 from elasticsearch import Elasticsearch
-es = Elasticsearch('https://localhost:9200',ca_certs='./first/config/certs/http_ca.crt')
 
-doc = {
-    'author': 'author_name',
-    'text': 'Interensting content...',
-    'timestamp': datetime.now(),
-}
-resp = es.index(index="test-index", id=1, document=doc)
-print(resp['result'])
+# connection to elastic
+es = Elasticsearch(
+            ["https://elastic:c1+=-8fC3kMvGJ-JLb_J@localhost:9200"],
+            use_ssl=True,
+            verify_certs=True,
+            ca_certs='./first/config/certs/http_ca.crt',
+        )
+
+# verify connection
 # print(es.ping())
+
+# Create index
+# es.indices.create(index='test-index-23_02_2023', ignore=400)
+
+# get all indices
+# indices = es.indices.get_alias("*")
+
+# delete index
+# es.indices.delete(index='test-index-23_02_2023', ignore=[400, 404])
+
+# Search index
+# index = "products"
+# try:
+#     resp = es.search(index=index)
+#     print(resp["_shards"]["total"])
+# except Exception as e:
+#     print("Index does not exist")
+
+# search if index exists based on pattern
+# index = "reviews*"
+# try:
+#     resp = es.search(index=index)
+#     print(resp["_shards"]["total"])
+# except Exception as e:
+#     print("Index does not exist")
+
+
