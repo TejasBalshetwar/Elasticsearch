@@ -21,7 +21,7 @@ es = Elasticsearch(
 # delete index
 # es.indices.delete(index='test-index-23_02_2023', ignore=[400, 404])
 
-# Search index
+# Search for index
 # index = "products"
 # try:
 #     resp = es.search(index=index)

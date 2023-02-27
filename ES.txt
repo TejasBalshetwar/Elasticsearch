@@ -61,12 +61,11 @@ Introduction to sharding:
 Purpose:
 1. Mainly to be able to store more documents
 2. To easier fit large indices onto nodes
-3. Imoroved performance - Parallelization of queries increases the throughput of an index.i.e a query can run on multiple shards at same time
+3. Improved performance - Parallelization of queries increases the throughput of an index.i.e a query can run on multiple shards at same time
 
 An index contains a single shard by default
 We can increase the number of shards per index by using the split API
 We can decrease the number of shards per index by using the shrink API
-
 
 
 Replication:
@@ -84,10 +83,10 @@ Generally replication once is enough but in critical cases data should be replic
 
 Snapshots:
 Elasticsearch supports taking snapshots as backups
-Snapshots ca be used to restore to a given point in time
+Snapshots can be used to restore to a given point in time
 Snapshots can be taken at index level or for the entire cluster
 
-Replication only assures high availability but the consistency is not assured for rollback we have to use snapshots
+Replication only assures high availability but the consistency is not assured. for rollback we have to use snapshots
 Replication can also increase the query throughput because instead of querying a single shard we can have multiple replicas and query them.
 
 To create a simple index use following command: PUT /<name-of-index>
