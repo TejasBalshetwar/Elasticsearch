@@ -69,7 +69,7 @@ es = Elasticsearch(
 
 
 # update a document
-# es.update(index="employees", id='O-p-koYBJdUnV4UuZxFA', doc={'country': 'US'},)
+# es.update(index="employees", id='Oup-koYBJdUnV4UuZxEw', doc={'country': 'US'},)
 # res = es.get(index="employees", id='O-p-koYBJdUnV4UuZxFA')
 # print(res)
 
@@ -77,11 +77,55 @@ es = Elasticsearch(
 # res = es.delete(index="employees", id='O-p-koYBJdUnV4UuZxFA')
 # print(res)
 
+# Simplest search query
+# print(es.search(index="employees", query={"match_all": {}}))
+
 # basic term query
 # print(es.search(index="employees", query={"match": {'name':'Sanjay'}}))
 
-# full-text search
+# term query with keyword field with case insensitive parameter
+# print(es.search(index="employees", query={"term":{"programming_languages.keyword":{"value":"Python","case_insensitive":True}}}))
+
+# terms query
+# print(es.search(index="employees", query={"terms":{"programming_languages.keyword":["Ruby","nodejs"]}}))
+
+# documents based on IDs
+# print(es.search(index="employees",query={"ids":{"values":["OOp-koYBJdUnV4UuZREd","Oep-koYBJdUnV4UuZxEk"]}}))
+
+# range search
+# print(es.search(index="employees", query={"range": {'age':{"gte": 21, "lte": 30}}}))
+
+# prefix search
+# print(es.search(index="employees", query={"prefix": {'name':{"value":"A","case_insensitive":True}}}))
+
+# single-char wildcard search
+# print(es.search(index="employees",query={"wildcard":{"programming_languages.keyword":"?uby"}}))
+
+# multi-char wildcard search
+# print(es.search(index="employees",query={"wildcard":{"programming_languages.keyword":"p*"}}))
+
+# regex search . stands for any character and * stands for any number of characters and ? stands for any single character
+# print(es.search(index="employees", query={"regexp": {'name':'.*n.*'}}))
+
+# querying by field existance
+# print(es.search(index="employees", query={"exists": {"field": "country"}}))
+
+# match query full-text search with operator and but default is or
+# print(es.search(index="employees",query={"match":{"name":"arjun"}}))
+# print(es.search(index="employees",query={"match":{"name":{"query":"vishnu arjun","operator":"and"}}}))
+
+# searching multiple fields
+# print(es.search(index="employees",query={"multi_match":{"query":"ruby","fields":["name","programming_languages"]}})) # searches for word in both name and programming_languages field
+# We can also boost relevance score for a particular field which will give more importance to that field
+# a tie_breaker attribute can also be used which will basically multiply the relevance score of the lower score field with what we give the arguement and will add to the field with higher relevance score 
+
+# phrase searches
+# print(es.search(index="employees",query={"match_phrase":{"name":"arjun nepal"}}))
+# in match_phrase the order of the words entered matters and in consecutive manner unlike the match query
+
+
+
+# fuzzy search
 # print(es.search(index="employees", query={"fuzzy": {'programming_languages':'python'}}))
 
-# regex search
-print(es.search(index="employees", query={"regexp": {'name':'.*n.*'}}))
+
