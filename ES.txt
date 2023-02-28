@@ -956,3 +956,60 @@ GET /recipe/_search
     }
   }
 }
+
+Term and Match are leaf queries 
+We can combine leaf queries using the boolean operator
+We can use the must and must_not query to specify if the terms must or must not be present.
+There are also queries called should and should_not which boosts the relevance score if the terms are present but that does not mean that terms must be present
+
+Boosting query:
+The bool query enables us to increase relevance scores with should
+If we want to decrease the relevance score we use the boosting query
+In this we have positive and negative part for respective changes in the relevance scores
+E.g:
+{
+    "boosting": {
+      "positive": {
+        "match_all": {}
+      },
+      "negative": {
+        "match": {
+          "name": "arjun"
+        }
+      },
+      "negative_boost": 0.5
+    }
+  }
+
+dis_max:
+this query is executed whenever we use the multi_match query i.e multi_match query is disintegrated into multiple match query and then the score with highest relevance score will be selected and then if we specify the tie_breaker parameter the relevance score will be calculated accordingly
+
+
+Searching in nested data:
+GET /recipes/_search
+{
+  "query": {
+    "nested": {
+      "path": "ingredients",
+      "query": {
+        "bool": {
+          "must": [
+            {
+              "match": {
+                "ingredients.name": "parmesan"
+              }
+            },
+            {
+              "range": {
+                "ingredients.amount": {
+                  "gte": 100
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
+

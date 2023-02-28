@@ -1,0 +1,29 @@
+{
+    "bool": {
+        "filter": [
+            {
+                "range": {
+                    "age": {
+                        "lte": 300
+                    }
+                }
+            },
+            {
+                "term": {
+                    "programming_languages.keyword": "python"
+                }
+            }
+        ],
+        "must": [
+            {
+                "multi_match": {
+                    "query": "ruby",
+                    "fields": [
+                        "name",
+                        "programming_languages"
+                    ]
+                }
+            }
+        ]
+    }
+}
